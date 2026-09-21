@@ -17,6 +17,9 @@ func Serve(address string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", indexHandler)
 	mux.HandleFunc("/solve", solveHandler)
+	// Serve static Web resources directly from the embedded filesystem.
+	// The files remain part of the EquaSolver binary at runtime.
+	mux.Handle("/static/", http.FileServer(http.FS(webFiles)))
 	server := &http.Server{
 		Addr:              address,
 		Handler:           mux,

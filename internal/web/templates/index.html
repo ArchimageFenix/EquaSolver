@@ -12,80 +12,244 @@ Restrictions: no domain logic. The check in the script only gives an immediate
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gauss — sistemas de ecuaciones</title>
-<style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, sans-serif; margin: 0; }
-  main { max-width: 46rem; margin: 0 auto; padding: 1rem; }
-  textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 1rem; }
-  button { font-size: 1rem; padding: .5rem 1rem; margin-top: .5rem; }
-  .error { color: #b00020; min-height: 1.2rem; margin: .25rem 0; }
-  .op { margin: .1rem 0; font-family: monospace; }
-  table.matrix { border-collapse: collapse; font-family: monospace; margin: .5rem 0 1rem; }
-  table.matrix td { padding: .15rem .6rem; text-align: right; }
-  table.matrix td:last-child { border-left: 2px solid currentColor; }
-  h3 { margin-bottom: .25rem; font-size: 1rem; }
-</style>
+<title>EquaSolver — Sistemas de ecuaciones</title>
+<link rel="stylesheet" href="/static/css/equasolver.css">
+
+
 </head>
+
 <body>
+
 <main>
-  <h1>Sistemas de ecuaciones (método de Gauss)</h1>
-  <form method="post" action="/solve">
-    <label for="matrix">Matriz ampliada: una ecuación por línea, con los coeficientes y el término independiente separados por espacio. Use punto decimal.</label>
-    <textarea id="matrix" name="matrix" rows="6" spellcheck="false" placeholder="1 1 1 6&#10;2 -1 1 3&#10;1 2 -1 2">{{.Input}}</textarea>
-    <p id="message" class="error" role="alert">{{.Error}}</p>
-    <button id="submit" type="submit">Resolver</button>
-  </form>
+
+  
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">E</div>
+      <h1 class="brand-name">EquaSolver</h1>
+    </div>
+
+    <p class="app-subtitle">
+      Resolución de sistemas de ecuaciones lineales mediante el método de Gauss.
+    </p>
+  </header>
+
+  <!-- Entrada existente, presentada con la nueva identidad visual. -->
+  <section class="input-card">
+
+    <p class="section-kicker">Sistema de ecuaciones</p>
+    <h2 class="input-title">Matriz ampliada</h2>
+
+    <p class="input-description">
+      Introduzca una ecuación por línea. Escriba los coeficientes y el término
+      independiente separados por espacios.
+    </p>
+
+    <form method="post" action="/solve">
+
+      <label for="matrix">
+        Coeficientes y término independiente
+      </label>
+
+      <textarea
+        id="matrix"
+        name="matrix"
+        rows="6"
+        spellcheck="false"
+        placeholder="1 1 1 6&#10;2 -1 1 3&#10;1 2 -1 2"
+      >{{.Input}}</textarea>
+
+      <p class="input-help">
+        Use punto decimal. Cada fila debe contener los coeficientes de la
+        ecuación y su término independiente.
+      </p>
+
+      <p
+        id="message"
+        class="error"
+        role="alert"
+      >{{.Error}}</p>
+
+      <div class="form-actions">
+        <button id="submit" type="submit">
+          Resolver
+        </button>
+      </div>
+
+    </form>
+
+  </section>
+
+
+  <!--
+    Resultado actual.
+    Su estructura se conserva durante la Fase 1.
+    Será renovado en las siguientes fases.
+  -->
 {{with .Result}}
-  <section>
-    <h2>Matriz original</h2>
-    {{template "matrix" .Original}}
-    <h2>Pasos</h2>
+  <section class="original-card">
+
+  <div class="result-section-heading">
+    <span class="section-number" aria-hidden="true">2</span>
+
+    <div>
+      <p class="section-kicker">Estado inicial</p>
+      <h2>Matriz original</h2>
+    </div>
+  </div>
+
+  <div class="original-content">
+
+    <div class="matrix-panel">
+      <div class="matrix-scroll">
+        {{template "matrix" .Original}}
+      </div>
+    </div>
+
+    <aside class="matrix-info">
+      <strong>Información</strong>
+      <p>
+        Matriz ampliada original recibida antes de iniciar
+        la eliminación de Gauss.
+      </p>
+    </aside>
+
+  </div>
+  </section>
+
+  <section class="steps-card">
+
+  <div class="result-section-heading">
+    <span class="section-number" aria-hidden="true">3</span>
+
+    <div>
+      <p class="section-kicker">Eliminación de Gauss</p>
+      <h2>Pasos</h2>
+    </div>
+  </div>
+
     {{range .Steps}}
+
+  <div class="timeline-step">
+
+    <div class="timeline-marker" aria-hidden="true"></div>
+
+    <article class="step-card">
+
       <h3>{{.Title}}</h3>
-      {{range .Operations}}<p class="op">{{.}}</p>{{end}}
-      {{if .Matrix}}{{template "matrix" .Matrix}}{{end}}
+
+      {{range .Operations}}
+        <p class="op">{{.}}</p>
+      {{end}}
+
+      {{if .Matrix}}
+        <div class="matrix-scroll">
+          {{template "matrix" .Matrix}}
+        </div>
+      {{end}}
+
+    </article>
+
+  </div>
+
+{{end}}
+</section>
+
+    {{if .Echelon}}
+      <h2>Matriz escalonada</h2>
+      {{template "matrix" .Echelon}}
     {{end}}
-    {{if .Echelon}}<h2>Matriz escalonada</h2>{{template "matrix" .Echelon}}{{end}}
+
     <h2>Resultado: {{.Title}}</h2>
-    {{range .Detail}}<p>{{.}}</p>{{end}}
-    {{if .Solution}}<ul>{{range .Solution}}<li>{{.}}</li>{{end}}</ul>{{end}}
+
+    {{range .Detail}}
+      <p>{{.}}</p>
+    {{end}}
+
+    {{if .Solution}}
+      <ul>
+        {{range .Solution}}
+          <li>{{.}}</li>
+        {{end}}
+      </ul>
+    {{end}}
   </section>
 {{end}}
+
+
+
+
+
 </main>
+
+
 <script>
 (function () {
   var field = document.getElementById("matrix");
   var message = document.getElementById("message");
   var button = document.getElementById("submit");
+
   var number = /^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$/;
 
   function check() {
-    var rows = field.value.split(/[\n;]/).map(function (r) { return r.trim(); }).filter(Boolean);
+    var rows = field.value
+      .split(/[\n;]/)
+      .map(function (r) { return r.trim(); })
+      .filter(Boolean);
+
     for (var i = 0; i < rows.length; i++) {
       var cells = rows[i].split(/\s+/);
+
       if (cells.length !== rows.length + 1) {
-        return "Ecuación " + (i + 1) + ": se esperaban " + (rows.length + 1) + " números y se recibieron " + cells.length + ".";
+        return "Ecuación " + (i + 1) +
+          ": se esperaban " + (rows.length + 1) +
+          " números y se recibieron " + cells.length + ".";
       }
+
       for (var j = 0; j < cells.length; j++) {
         if (!number.test(cells[j])) {
-          return "Ecuación " + (i + 1) + ": \"" + cells[j] + "\" no es un número válido (use punto decimal, sin letras ni símbolos).";
+          return "Ecuación " + (i + 1) +
+            ": \"" + cells[j] +
+            "\" no es un número válido (use punto decimal, sin letras ni símbolos).";
         }
       }
     }
+
     return "";
   }
 
   function update(showMessage) {
     var problem = check();
-    if (showMessage) { message.textContent = problem; }
-    button.disabled = problem !== "" || field.value.trim() === "";
+
+    if (showMessage) {
+      message.textContent = problem;
+    }
+
+    button.disabled =
+      problem !== "" ||
+      field.value.trim() === "";
   }
 
-  field.addEventListener("input", function () { update(true); });
+  field.addEventListener("input", function () {
+    update(true);
+  });
+
   update(false);
 })();
 </script>
+
 </body>
 </html>
-{{define "matrix"}}<table class="matrix">{{range .}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</table>{{end}}
+
+
+{{define "matrix"}}
+<table class="matrix">
+  {{range .}}
+    <tr>
+      {{range .}}
+        <td>{{.}}</td>
+      {{end}}
+    </tr>
+  {{end}}
+</table>
+{{end}}
