@@ -1,313 +1,515 @@
-# EquaSolver
-
-**Resolutor de sistemas cuadrados de ecuaciones lineales desarrollado en Go**
-
-EquaSolver es una aplicación desarrollada en **Go** para resolver sistemas cuadrados de **n ecuaciones lineales con n incógnitas** mediante el método de eliminación de Gauss.
-
-El programa transforma el sistema en una matriz aumentada, ejecuta el proceso de eliminación hacia adelante con **pivoteo parcial**, obtiene una matriz escalonada y utiliza **sustitución hacia atrás** para calcular las incógnitas.
-
-EquaSolver dispone de dos interfaces —**CLI y Web**— construidas sobre el mismo núcleo matemático.
-
-
 <p align="center">
   <img src="assets/logo.png" alt="EquaSolver Logo" width="500">
 </p>
 
+# EquaSolver
+
+**Resolutor de sistemas de ecuaciones lineales mediante eliminación de Gauss**
+
+EquaSolver es una aplicación desarrollada en **Go** para resolver y analizar sistemas cuadrados de **n ecuaciones lineales con n incógnitas**.
+
+Utiliza **eliminación de Gauss con pivoteo parcial** para transformar la matriz aumentada del sistema y determinar su naturaleza. Cuando existe una solución única, aplica **sustitución hacia atrás** para calcular las incógnitas.
+
+El programa no se limita a entregar el resultado final: muestra la matriz original, las operaciones realizadas durante la eliminación, la matriz escalonada y el resultado del análisis.
+
+Dispone de interfaces **CLI y Web**, ambas construidas sobre el mismo núcleo matemático.
+
 ---
 
-## ¿Qué resuelve?
+## ¿Qué puede resolver?
 
-EquaSolver trabaja exclusivamente con sistemas cuadrados:
+EquaSolver trabaja con sistemas cuadrados:
 
-```text id="s1wwh0"
+```text
 n ecuaciones
 n incógnitas
-```
-
-con:
-
-```text id="3oq8v2"
 n ≥ 1
 ```
 
 De forma general:
 
-```text id="jq2vb9"
+```text
 a₁₁x₁ + a₁₂x₂ + ... + a₁ₙxₙ = b₁
 a₂₁x₁ + a₂₂x₂ + ... + a₂ₙxₙ = b₂
                   ...
 aₙ₁x₁ + aₙ₂x₂ + ... + aₙₙxₙ = bₙ
 ```
 
-Por ejemplo, un sistema de `3 × 3`:
+Por ejemplo:
 
-```text id="rqrwn9"
- 2x +  y -  z =   8
--3x -  y + 2z = -11
--2x +  y + 2z =  -3
+```text
+ 2x + 3y -  z + 2w =  12
+ 4x -  y + 2z +  w =  11
+-2x + 5y + 3z -  w =   7
+ 3x + 2y + 4z + 3w =  25
 ```
 
-se representa mediante su matriz aumentada:
+se representa mediante la matriz aumentada:
 
-```text id="1jv16m"
-[  2   1  -1 |   8 ]
-[ -3  -1   2 | -11 ]
-[ -2   1   2 |  -3 ]
+```text
+[  2   3  -1   2 | 12 ]
+[  4  -1   2   1 | 11 ]
+[ -2   5   3  -1 |  7 ]
+[  3   2   4   3 | 25 ]
 ```
 
-El núcleo utiliza esta representación para realizar el proceso de resolución.
+No existe un algoritmo diferente para `2×2`, `3×3`, `4×4`, etc. El núcleo trabaja de forma general con la dimensión `n`.
 
 ---
 
-## Alcance actual
+## Clasificación del sistema
 
-EquaSolver está diseñado para resolver **sistemas cuadrados completos que admiten una solución mediante el procedimiento implementado**.
+Que un sistema sea cuadrado no significa necesariamente que posea una única solución.
 
-Actualmente el programa no está orientado a resolver o clasificar:
+EquaSolver analiza los rangos de la matriz de coeficientes y de la matriz ampliada para distinguir los siguientes casos:
 
-* Sistemas incompletos.
-* Sistemas inconsistentes.
-* Sistemas con infinitas soluciones.
-* Sistemas rectangulares de `m × n`.
+| Resultado                | Condición                                        |
+| ------------------------ | ------------------------------------------------ |
+| **Solución única**       | `r = r' = n`                                     |
+| **Infinitas soluciones** | `r = r' < n`                                     |
+| **Sin solución**         | `r < r'`                                         |
+| **Fallo numérico**       | Se detecta un valor no finito durante el cálculo |
 
-Estas situaciones se encuentran fuera del alcance actual del resolutor.
+donde:
 
-El objetivo es mantener claramente delimitado el dominio matemático que el programa acepta antes de ampliar sus capacidades.
+* `r` es el rango de la matriz de coeficientes.
+* `r'` es el rango de la matriz ampliada.
+* `n` es el número de incógnitas.
+
+Los casos de infinitas soluciones o ausencia de solución se consideran **resultados matemáticos del análisis**, no errores de ejecución.
+
+Cuando existe una contradicción, una fila equivalente a:
+
+```text
+0  0  0  ...  0 | c
+```
+
+con `c ≠ 0` permite identificar un sistema sin solución.
 
 ---
 
 ## Método de resolución
 
-El núcleo utiliza **eliminación de Gauss con pivoteo parcial**.
+El proceso general seguido por EquaSolver es:
 
-El flujo matemático es:
-
-```text id="zjokhg"
+```text
 Sistema n × n
       │
       ▼
+Validación
+      │
+      ▼
 Matriz aumentada
       │
       ▼
-Selección del pivote
+Cálculo de tolerancia
       │
       ▼
-Pivoteo parcial
+Eliminación de Gauss
       │
-      ▼
-Eliminación hacia adelante
+      ├── Selección de pivote
+      ├── Pivoteo parcial
+      └── Eliminación hacia adelante
       │
       ▼
 Matriz escalonada
       │
       ▼
-Sustitución hacia atrás
+Clasificación
       │
-      ▼
-Valores de las incógnitas
+      ├── Solución única
+      │        │
+      │        ▼
+      │  Sustitución hacia atrás
+      │        │
+      │        ▼
+      │     Solución
+      │
+      ├── Infinitas soluciones
+      │
+      └── Sin solución
 ```
-
-### Eliminación hacia adelante
-
-Las operaciones elementales transforman progresivamente la matriz aumentada hasta obtener una estructura escalonada.
 
 ### Pivoteo parcial
 
-Durante la eliminación, el algoritmo puede intercambiar filas para seleccionar un pivote adecuado.
+En cada columna se selecciona como pivote la fila disponible cuyo elemento tenga el **mayor valor absoluto**.
 
-Esto evita depender únicamente del elemento que originalmente ocupa la posición del pivote y mejora el comportamiento numérico del proceso.
+Si es necesario, las filas son intercambiadas antes de continuar con la eliminación.
+
+Por ejemplo:
+
+```text
+2
+4   ← mayor valor absoluto
+-2
+3
+```
+
+provoca que la fila que contiene `4` sea utilizada como primera fila pivote.
+
+Esta estrategia mejora el comportamiento numérico respecto a utilizar siempre el elemento que originalmente ocupa la posición del pivote.
+
+### Eliminación hacia adelante
+
+Una vez seleccionado el pivote, se aplican operaciones elementales para eliminar los coeficientes situados debajo de él.
+
+El proceso produce progresivamente una matriz escalonada de forma similar a:
+
+```text
+[a  b  c  d | e]
+[0  f  g  h | i]
+[0  0  j  k | l]
+[0  0  0  m | n]
+```
 
 ### Sustitución hacia atrás
 
-Una vez obtenida la matriz escalonada, el sistema se recorre desde la última ecuación hacia la primera para calcular progresivamente las incógnitas.
+Cuando el sistema posee solución única, EquaSolver comienza por la última ecuación y calcula las incógnitas en sentido inverso:
 
----
-
-## Sistemas de tamaño n × n
-
-El algoritmo no está limitado específicamente a sistemas de `2 × 2` o `3 × 3`.
-
-La estructura general permite trabajar con sistemas cuadrados de diferentes dimensiones:
-
-```text id="79njpj"
-1 × 1
-2 × 2
-3 × 3
-4 × 4
-...
-n × n
+```text
+xₙ → xₙ₋₁ → ... → x₂ → x₁
 ```
 
-Esto significa que no existe un algoritmo independiente para cada tamaño.
-
-El mismo núcleo de Gauss procesa el sistema utilizando su dimensión `n`.
+La sustitución hacia atrás solo se ejecuta cuando la clasificación determina que existe una solución única.
 
 ---
 
-## El proceso es visible
+## El procedimiento es visible
 
-EquaSolver no está pensado únicamente para recibir un sistema y devolver los valores finales.
+EquaSolver está diseñado para mostrar **cómo se obtiene el resultado**, no únicamente el resultado final.
 
-También permite observar el procedimiento utilizado para llegar a ellos:
+Una resolución incluye:
 
-```text id="q6pcmx"
-Sistema original
-       │
-       ▼
-Matriz aumentada
-       │
-       ▼
-Pasos de eliminación
-       │
-       ▼
+```text
+Matriz original
+      │
+      ▼
+Paso 1
+  operaciones entre filas
+  matriz resultante
+      │
+      ▼
+Paso 2
+  operaciones entre filas
+  matriz resultante
+      │
+      ▼
+     ...
+      │
+      ▼
 Matriz escalonada
-       │
-       ▼
-Sustitución hacia atrás
-       │
-       ▼
-Solución
+      │
+      ▼
+Clasificación
+      │
+      ▼
+Resultado
 ```
 
-Esto permite utilizar EquaSolver no solamente como herramienta de cálculo, sino también como apoyo para comprender el funcionamiento del método de Gauss.
+Por ejemplo, durante un paso puede mostrarse:
+
+```text
+Paso 1 (columna 1):
+intercambiar fila 1 con fila 2 (pivote 4.00)
+
+fila 2 = fila 2 - 0.50 × fila 1
+fila 3 = fila 3 + 0.50 × fila 1
+fila 4 = fila 4 - 0.75 × fila 1
+```
+
+Esto permite utilizar EquaSolver tanto como herramienta de cálculo como para observar y estudiar el procedimiento de eliminación de Gauss.
 
 ---
 
 ## CLI y Web
 
-EquaSolver ofrece dos formas de utilizar el resolutor.
+EquaSolver dispone de **dos interfaces independientes sobre un mismo núcleo**.
 
-### CLI
-
-La interfaz de línea de comandos permite introducir y resolver sistemas directamente desde una terminal.
-
-```text id="d2ixcf"
-Usuario
-  │
-  ▼
- CLI
-  │
-  ▼
-Núcleo Gauss
-  │
-  ▼
-Resultado
+```text
+             ┌─────────────┐
+             │     CLI     │
+             └──────┬──────┘
+                    │
+                    ▼
+             model.System
+                    │
+                    ▼
+       ┌────────────────────────┐
+       │    Núcleo EquaSolver   │
+       │                        │
+       │ validation             │
+       │ tolerance              │
+       │ elimination            │
+       │ classification         │
+       │ substitution           │
+       │ solver                 │
+       └────────────┬───────────┘
+                    │
+                    ▼
+             model.Result
+                    │
+             ┌──────┴──────┐
+             ▼             ▼
+            CLI           Web
 ```
 
-### Web
+CLI y Web **no implementan sus propios algoritmos de Gauss**.
 
-La interfaz Web permite utilizar el mismo resolutor desde un navegador mediante una presentación gráfica.
+Ambas entregan los datos al mismo núcleo y reciben de él una estructura de resultado independiente de la interfaz.
 
-```text id="sq1yt5"
-Usuario
-  │
-  ▼
- Web
-  │
-  ▼
-Núcleo Gauss
-  │
-  ▼
-Resultado
-```
-
-Las interfaces **no contienen implementaciones independientes del algoritmo matemático**.
-
-Ambas utilizan el mismo núcleo:
-
-```text id="mv7uzd"
-        ┌─────────┐
-        │   CLI   │
-        └────┬────┘
-             │
-             ▼
-      ┌──────────────┐
-      │    Núcleo    │
-      │    Gauss     │
-      └──────────────┘
-             ▲
-             │
-        ┌────┴────┐
-        │   Web   │
-        └─────────┘
-```
-
-De esta manera, una modificación o corrección en el algoritmo puede beneficiar a ambas interfaces sin duplicar la lógica matemática.
+Esto evita duplicar la lógica matemática y permite que una corrección o mejora del núcleo sea utilizada automáticamente por ambas interfaces.
 
 ---
 
-## Características
+## Interfaz CLI
+
+La interfaz de línea de comandos permite utilizar EquaSolver directamente desde una terminal.
+
+Admite diferentes formas de proporcionar un sistema:
+
+### Entrada interactiva
+
+El programa solicita el tamaño y posteriormente cada ecuación:
+
+```text
+Forma de ingreso:
+  1. Escribir los datos
+  2. Leer desde archivo
+
+Opción:
+
+Número de ecuaciones (entero mayor que 0):
+
+Ecuación 1
+(n coeficientes y término independiente, separados por espacio):
+```
+
+### Desde archivo
+
+Puede utilizarse:
+
+```text
+-f <archivo>
+```
+
+para cargar un sistema almacenado en un archivo de texto.
+
+### Desde argumentos
+
+También puede proporcionarse directamente una matriz mediante:
+
+```text
+-m "<filas separadas por ;>"
+```
+
+Cuando se utiliza `-f` o `-m`, el menú interactivo puede omitirse.
+
+---
+
+## Interfaz Web
+
+La interfaz Web proporciona acceso al mismo resolutor desde un navegador.
+
+El flujo es:
+
+```text
+Navegador
+    │
+    ▼
+Formulario
+    │
+    ▼
+Validación Web
+    │
+    ▼
+Servidor
+    │
+    ▼
+Núcleo EquaSolver
+    │
+    ▼
+Resultado
+    │
+    ▼
+Presentación Web
+```
+
+Los datos son validados antes de llegar al núcleo. Si la entrada es incorrecta, el usuario recibe un mensaje y el cálculo no se inicia.
+
+La Web no contiene lógica matemática propia: utiliza exactamente el mismo `solver` que la CLI.
+
+---
+
+## Precisión y estabilidad numérica
+
+Los cálculos internos utilizan **doble precisión de 64 bits**.
+
+Los valores no se redondean durante la resolución. El redondeo se realiza únicamente al presentar los resultados.
+
+EquaSolver utiliza una tolerancia relativa basada en:
+
+```text
+tolerancia = n × ε × máx|aᵢⱼ|
+```
+
+donde `ε` representa el épsilon de máquina para doble precisión.
+
+Un valor suficientemente pequeño respecto a esta tolerancia puede considerarse cero durante el análisis.
+
+Además, después de las operaciones numéricas se controla que los valores permanezcan finitos. La aparición de `NaN` o infinito detiene el cálculo de forma controlada y produce un resultado de **fallo numérico**.
+
+---
+
+## Validación
+
+Los datos pasan por diferentes niveles de validación antes del cálculo.
+
+Entre otras condiciones, se verifica que:
+
+* `n ≥ 1`.
+* La matriz de coeficientes sea `n × n`.
+* Existan exactamente `n` términos independientes.
+* Los valores sean números reales finitos.
+* No se introduzcan `NaN` ni infinito.
+* La entrada tenga una estructura válida.
+
+El núcleo mantiene además su propia validación como última barrera, independientemente de que los datos procedan de CLI o Web.
+
+---
+
+## Características principales
 
 * Desarrollado en **Go**.
-* Resolución de sistemas cuadrados `n × n`.
-* Número de ecuaciones igual al número de incógnitas.
+* Solo utiliza la **biblioteca estándar de Go**.
+* Sistemas cuadrados de `n` ecuaciones y `n` incógnitas.
+* Sin límite máximo artificial para `n` en el núcleo.
 * Eliminación de Gauss.
 * Pivoteo parcial.
 * Sustitución hacia atrás.
-* Representación mediante matriz aumentada.
+* Cálculo de rangos.
+* Detección de solución única.
+* Detección de infinitas soluciones.
+* Detección de sistemas inconsistentes.
+* Control de valores numéricos no finitos.
 * Visualización de la matriz original.
-* Visualización del proceso de eliminación.
+* Visualización paso a paso de la eliminación.
 * Visualización de la matriz escalonada.
-* Presentación de las incógnitas calculadas.
 * Interfaz **CLI**.
 * Interfaz **Web**.
-* Núcleo matemático compartido.
-
----
-
-## Tecnología
-
-| Elemento            | Implementación                  |
-| ------------------- | ------------------------------- |
-| Lenguaje            | Go                              |
-| Dominio             | Álgebra lineal                  |
-| Problema            | Sistemas de ecuaciones lineales |
-| Sistemas admitidos  | Cuadrados                       |
-| Dimensión           | n × n                           |
-| Algoritmo           | Eliminación de Gauss            |
-| Selección de pivote | Pivoteo parcial                 |
-| Resolución final    | Sustitución hacia atrás         |
-| Interfaces          | CLI + Web                       |
-| Núcleo              | Compartido                      |
+* Entrada CLI interactiva, mediante archivo o argumentos.
+* Núcleo matemático compartido entre interfaces.
 
 ---
 
 ## Arquitectura
 
-EquaSolver mantiene una separación entre:
+El principio fundamental de EquaSolver es mantener el **núcleo matemático independiente de la forma en que el usuario interactúa con él**.
 
-```text id="4kmqjt"
-Entrada / Interfaces
-        │
-        ▼
-Aplicación
-        │
-        ▼
-Núcleo matemático
-        │
-        ▼
-Resultados
-        │
-        ▼
+```text
+Interfaces
+    │
+    ▼
+Adaptadores
+    │
+    ▼
+   Model
+    │
+    ▼
+  Solver
+    │
+    ├── Validation
+    ├── Tolerance
+    ├── Elimination
+    ├── Classification
+    └── Substitution
+    │
+    ▼
+  Result
+    │
+    ▼
 Presentación
 ```
 
-Esta separación permite mantener el algoritmo matemático como la pieza central del programa mientras CLI y Web funcionan como formas diferentes de interactuar con él.
+El núcleo:
 
-La documentación técnica completa del diseño se encuentra en:
+* No conoce HTTP.
+* No conoce la consola.
+* No imprime resultados.
+* No lee archivos.
+* No contiene HTML.
+* No depende de CLI ni Web.
+
+Las interfaces dependen del núcleo, nunca al contrario.
+
+La arquitectura completa, responsabilidades de cada módulo, flujo de datos y reglas de ampliación están documentadas en:
 
 **[`ARCHITECTURE.md`](ARCHITECTURE.md)**
 
-Allí se documentan la estructura de carpetas y archivos, responsabilidades de los módulos, flujo de datos, dependencias y reglas de ampliación del proyecto.
+---
+
+## Estructura general
+
+```text
+EquaSolver/
+├── ARCHITECTURE.md
+├── README.md
+├── go.mod
+├── assets/
+│   └── logo.png
+├── cmd/
+│   ├── cli/
+│   └── web/
+├── internal/
+│   ├── numeric/
+│   ├── model/
+│   ├── validation/
+│   ├── tolerance/
+│   ├── elimination/
+│   ├── classification/
+│   ├── substitution/
+│   ├── solver/
+│   ├── format/
+│   ├── cli/
+│   └── web/
+└── docs/
+```
+
+Las pruebas unitarias se mantienen junto a los paquetes correspondientes siguiendo las convenciones habituales de Go.
 
 ---
 
-## Estado del proyecto
+## Limitaciones conocidas
+
+EquaSolver trabaja actualmente con **sistemas cuadrados**: el número de ecuaciones debe coincidir con el número de incógnitas.
+
+Para poder mostrar el procedimiento completo, el programa conserva la matriz correspondiente a cada columna de pivote. Por esta razón, el consumo de memoria aumenta significativamente para valores muy grandes de `n`.
+
+Como ocurre con los métodos numéricos que utilizan aritmética de punto flotante, la tolerancia tampoco puede resolver de forma perfecta todos los sistemas casi singulares. Por ello EquaSolver conserva y muestra los pasos y la matriz final del proceso.
+
+---
+
+## Documentación
+
+La documentación técnica del proyecto se encuentra en:
+
+**[`ARCHITECTURE.md`](ARCHITECTURE.md)** — arquitectura, responsabilidades, dependencias y reglas del proyecto.
+
+**`docs/analisis.md`** — análisis realizado durante el desarrollo.
+
+**`docs/capacidades.md`** — capacidades actuales y formas de utilización.
+
+---
+
+## Estado
 
 **En desarrollo.**
 
-El alcance actual se concentra en resolver correctamente sistemas cuadrados mediante eliminación de Gauss antes de incorporar otros tipos de sistemas o métodos de resolución.
+El proyecto continúa evolucionando manteniendo una separación estricta entre el núcleo matemático y sus interfaces.
 
 ---
 
-**EquaSolver — Solve linear systems with Gauss.**
+## Autor
+
+Desarrollado por **ArchimageFenix**.
+
+**EquaSolver — Solve any system.**
