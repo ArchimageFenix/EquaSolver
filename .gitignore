@@ -1,0 +1,22 @@
+# Ejecutables generados por Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Binarios / compilaciones
+/bin/
+build/
+dist/
+
+# Archivos de pruebas
+*.test
+*.out
+
+# VS Code
+.vscode/
+
+# Archivos temporales
+*.tmp
+*.log
